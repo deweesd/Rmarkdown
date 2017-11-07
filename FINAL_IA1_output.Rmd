@@ -1,0 +1,400 @@
+---
+title: "Results section of IA1_Bi610"
+author: "Dane Dewees"
+date: '`r date()`'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r echo=FALSE}
+#Color Format - `r colFmt("green TEXT",'green')`
+library(knitr)
+colFmt = function(x,color){
+  outputFormat = opts_knit$get("rmarkdown.pandoc.to")
+  if(outputFormat == 'latex')
+    paste("\\textcolor{",color,"}{",x,"}",sep="")
+  else if(outputFormat == 'html')
+    paste("<font color='",color,"'>",x,"</font>",sep="")
+  else
+    x
+}
+```
+
+Background
+----------
+
+This study was used to determine whether or not feeding zebrafish with enriched brine shrimp nauplii (treated with a particular supplement) affects mean zebrafish size. One of the main objectivs is to determine whether size might be affected differentially in terms of overall length of the fish, as determined by it’s standard length in millimeters (mm), as compared to body mass, as measured by wet weight in milligrams (mg).
+
+We sampled 200 newly hatched zebrafish from the same clutch and randomly assign each to either an enriched shrimp diet or an unenriched shrimp (“control”) diet. Made sure that the experiment was carried outcarefully and not confounded diet with any other variables that may affect size. After two months we measured the standard length and weight of all 200 fish. 
+
+Analysis
+--------
+
+We use R for all of the statistical analysis and computations in this paper. This includes various functions and commands in order to convey the desired trends found in this dataset. I used a distribution model, paired with a non-parametric approach (bootstrap) as well as a linear regression model. The corresponding R code can be found in the RMD file paired with this paper.
+
+In order to statistically address our question of interest (i.e., How does diet affect weight and physiological changes - SL?) a 1-sample t-test is performed with subsequent null and alternative hypotheses: 
+
+
+`r colFmt("**Weight**", 'green')`
+
+The Null hypothesis assumes that there is no mean difference in weight between control and enriched. The alternative hypothesis assumes that there is a non-zero mean difference in zebrafish weights between the two groups (categorical).
+
+ 1. Null = weight(control) - weight(enriched) = 0
+
+ 2. Alternative = weight(control) - weight(enriched) = !0
+
+`r colFmt("**Standard Length**", 'green')`
+
+The Null hypothesis assumes that there is no mean difference in SL between control and enriched. The alternative hypothesis assumes that there is a non-zero mean difference in zebrafish standard length between the two groups (categorical).
+
+  1. Null = SL(control) - SL(enriched) = 0
+
+  2. Alternative = SL(control) - SL(enriched) = !0
+
+
+The following dot_plot was constructed using the original dataset (while removing 2 outliers), for graphical interpretation of any interesting or unusual points. Here we see the distribution of weight versus standard length given the categorical variable (diet) and it's corresponding subgroups (control & enriched) and can tell that the affects of diet before running any parameters is indicative of the diets impact on weight and physiological changes in Zebrafish (Figure 1):
+```{r include=FALSE}
+library(tidyverse)
+library(magrittr)
+library(pander)
+require(gridExtra)
+```
+
+```{r echo=FALSE}
+setwd("/Users/Deweesd/Desktop/Advanced_Stats_with_R")
+#getwd
+
+
+Zebra_fish_diet_data <- read.table("zfish_diet_IA.tsv", sep = '\t', header = TRUE)
+
+#View(Zebra_fish_diet_data)
+
+# deleting outliers
+Zebra_fish_diet_data_update <- Zebra_fish_diet_data[-27,]
+Zebra_fish_diet_data_final <- Zebra_fish_diet_data_update[-140,]
+```
+
+`r colFmt("**Figure 1**", 'black')`
+```{r echo=FALSE}
+total_dataset_plot <- ggplot(data = Zebra_fish_diet_data_final, aes(y = Weight, x = SL, fill = Diet, bins = 30)) + geom_dotplot(binwidth = .06, binaxis = "x", stackdir = "center") + scale_fill_manual(values=c("slateblue1", "olivedrab1")) + theme(axis.text.x = element_text(angle = 40, vjust = 0.3, size = 6)) +
+  labs(x=expression(bold("SL")), y=expression(bold("Weight")), title=expression(bold("SL_Weight_Distribution_across_Diet")))
+
+total_dataset_plot
+```
+
+Isolating the categorical variable and it's paired distributions among the continuous varibles, we found that there was a corelation with regards to diet influencing both weight and SL (Figure 2), both the SL and weight continuous variables showed changes when diet changed from control to enriched. The enriched group for both SL and Weight had a higher overall mean difference than with the control subgroup (Fig. S1). Following this subset plot, we ran a 2-sample ttest for both subset datasets for SL & Weight and found that there was a statistically significant difference in mean SL of Zebrafish between the control & enriched groups (t_195.98=-16.27, p < 2.2e-16) and same for Weight (t_190.9=-14.08, p < 2.2e-16). 
+
+
+`r colFmt("**Figure 2**", 'black')`
+```{r echo=FALSE}
+
+
+Weight_Diet_plot <- ggplot(data = Zebra_fish_diet_data_final, aes(y = Weight, x = Diet)) + geom_boxplot(aes(fill = Diet)) + scale_fill_manual(values=c("slateblue1", "olivedrab1")) + theme(axis.text.x = element_text(angle = 40, vjust = 0.3, size = 6)) +
+  labs(x=expression(bold("Diet")), y=expression(bold("Weight")), title=expression(bold("Diet to Weight Distribution")))
+
+SL_Diet_plot <- ggplot(data = Zebra_fish_diet_data_final, aes(y = SL, x = Diet)) + geom_boxplot(aes(fill = Diet)) + scale_fill_manual(values=c("slateblue1", "olivedrab1")) + theme(axis.text.x = element_text(angle = 40, vjust = 0.3, size = 6)) +
+  labs(x=expression(bold("Diet")), y=expression(bold("SL")), title=expression(bold("Diet to SL Distribution")))
+
+
+grid.arrange(Weight_Diet_plot, SL_Diet_plot, ncol=2)
+
+
+# making output files and creating a dataset that compiles all the statistics for both sets of variables when compared to diet
+Data_summary_SL <- group_by(Zebra_fish_diet_data_final, Diet) %>%
+  summarise_at("SL", .funs = c(Variance = "var", Mean="mean", SD="sd", median="median")) %>%
+  write.csv('SL_Summary_Stats.csv', row.names = F)
+
+
+Data_summary_Weight <- group_by(Zebra_fish_diet_data_final, Diet) %>%
+  summarise_at("Weight", .funs = c(Variance = "var", Mean="mean", SD="sd", median="median")) %>%
+  write.csv('Weight_Summary_Stats.csv', row.names = F)
+
+
+# stats
+
+Weight_summary_table <- read.table("Weight_Summary_Stats.csv", sep = ",", header = TRUE)
+SL_summary_table <- read.table("SL_Summary_Stats.csv", sep = ",", header = TRUE)
+
+Summary_table <- rbind(Weight_summary_table, SL_summary_table)
+
+Summary_table$Variable <- c("SL", "SL", "Weight", "Weight")
+
+
+# flipping columns 
+Summary_table <- Summary_table[c("Variable", "Diet", "Variance", "Mean", "SD", "median")]
+
+# creating subset DFs for both control and enriched groups
+subset_data_control <- subset(Zebra_fish_diet_data_final, Diet=="Control")
+subset_data_enriched <- subset(Zebra_fish_diet_data_final, Diet=="Enriched")
+
+#View(subset_data_control)
+
+SL_ttest <- t.test(subset_data_control$SL, subset_data_enriched$SL)
+Weight_ttest <- t.test(subset_data_control$Weight, subset_data_enriched$Weight)
+
+
+#print(SL_ttest)
+#print(Weight_ttest)
+```
+
+Factoring in a non-parametric (like bootstrapping) in which it relies on random sampling with replacement. Bootstrapping allows assigning measures of accuracy, and in doing so we were able to see a distribution across both SL & Weight with regards to Diet. Resampling the data showed a positive trend of an even distribution when combining the datasets for all SL and Weight values for both control and enriched diets (Figure S2). Instead of viewing each variable independently, we appended the corresponding data in order to create a proper bootstrap function. Using statistical functions, we performed the same hypothesis test, and resampled the dataset 1000 times. Plotting the distribution of the resampled parameter with its mean and standard deviation along with the confidence interval (95%) gave us a visual representation of the overarching spread among the continuous variables (Figure 3). The corresponding statistical functions (i.e., mean, variance, CI) are shown as overlapping dashed and solid lines on the histgram, respectively. 
+
+
+
+
+
+
+```{r echo=FALSE}
+# Part 4
+
+# Bootstrap approach addon - function
+bootstrap_function <- function(value){
+  samples = 1000
+  sample_size = 100
+  
+  # creating a matrix of the 1000 trials among the 20 samples
+  boot_sample_matrix <- matrix(sample(value, size = samples * sample_size, replace = TRUE), samples, sample_size)
+  
+  # calculating the mean for each 1000 samples with 1 row
+  boot_stats <- apply(boot_sample_matrix, 1, mean)
+  
+  # only print out boot_stats values (martix, 1 value, and mean)
+  return(boot_stats)
+}
+
+# set an open dataframe so I can add the subset columns from initial dataframe for both control and enriched group
+bootstrap_DF <- NULL
+
+
+
+
+
+#View(subset_data_control)
+
+# calling bootstrap function made above for both variables SL & weight to the corresponding subset DFs
+bootstrap_DF$bootstrap_control_SL <- bootstrap_function(subset_data_control$SL)
+bootstrap_DF$bootstrap_enriched_SL <- bootstrap_function(subset_data_enriched$SL)
+bootstrap_DF$bootstrap_control_Weight <- bootstrap_function(subset_data_control$Weight)
+bootstrap_DF$bootstrap_enriched_Weight <- bootstrap_function(subset_data_enriched$Weight)
+
+
+
+# set as dataframe so I can call it during ggplot
+bootstrap_DF <- as.data.frame(bootstrap_DF)
+
+
+
+
+
+
+
+
+
+
+
+# basic stats for each column value (4 total) -- these will be used when I plot my resampled values
+mean_SL_E <- mean(bootstrap_DF$bootstrap_enriched_SL)
+mean_SL_C <- mean(bootstrap_DF$bootstrap_control_SL)
+
+
+mean_Weight_C <- mean(bootstrap_DF$bootstrap_control_Weight)
+mean_Weight_E <- mean(bootstrap_DF$bootstrap_enriched_Weight)
+
+
+#View(mean_Weight_C)
+#View(mean_Weight_E)
+
+#View(mean_SL_C)
+#View(mean_SL_E)
+
+
+SD_SL_E <- sd(bootstrap_DF$bootstrap_enriched_SL)
+SD_SL_C <- sd(bootstrap_DF$bootstrap_control_SL)
+SD_Weight_C <- sd(bootstrap_DF$bootstrap_control_Weight)
+SD_Weight_E <- sd(bootstrap_DF$bootstrap_enriched_Weight)
+
+
+#View(SD_SL_E)
+
+# confidence interval function
+CI_function <- function(value){
+  Gene_Standard_err <- sd(value)
+  # equation for variable that establishes marginal error (0.25% & 1 - sample size) times value of GSE
+  Gene_Margin_err <- qt(.975,999)*Gene_Standard_err
+  # Factoring in lower bound of distribution model in this variable (0.25%)
+  lower_CI <- mean(value) - Gene_Margin_err
+  # factoring in upper bound of distribution model in this variable (0.25%)
+  upper_CI <- mean(value) + Gene_Margin_err
+  # setting a list so it prints more than one variable when calling my function
+  stats_list <- c(lower_CI, upper_CI)
+  return(stats_list)
+}
+
+# SL CI
+CI_SL_E <- CI_function(bootstrap_DF$bootstrap_enriched_SL)
+CI_SL_C <- CI_function(bootstrap_DF$bootstrap_control_SL)
+
+# Weight CI
+CI_W_E <- CI_function(bootstrap_DF$bootstrap_enriched_Weight)
+CI_W_C <- CI_function(bootstrap_DF$bootstrap_control_Weight)
+
+#View(CI_W_E)
+
+# resample data
+SL_dataframe <- NULL
+Weight_dataframe <- NULL
+
+
+# Appending the two datasets (SL & Weight) into one column 
+SL_dataframe$combined_SL_Data <- c(bootstrap_DF[,1], bootstrap_DF[,2])
+Weight_dataframe$combined_weight_Data <- c(bootstrap_DF[,3], bootstrap_DF[,4])  
+
+#View(SL_dataframe)
+#View(Weight_dataframe)
+  
+SL_dataframe <- as.data.frame(SL_dataframe)
+Weight_dataframe <- as.data.frame(Weight_dataframe) 
+```
+
+
+
+`r colFmt("**Figure 3**", 'black')`
+```{r echo=FALSE}
+# part 4 figures with resampled data and stats overlapping hist 
+
+combined_hist_data_SL <- ggplot(data = SL_dataframe, aes(SL_dataframe$combined_SL_Data)) +
+  geom_histogram(aes(y = ..density..), alpha = 0.8, colour="black", fill="peachpuff", bins = 30) +
+  geom_vline(aes(xintercept= 3.98253, colour = "mean_Control"), linetype="solid", size=1, show.legend=TRUE) +
+  geom_vline(aes(xintercept= 4.474164, colour= "mean_Enriched"), linetype="solid", size=1, show.legend = TRUE) +
+  geom_vline(aes(xintercept= 4.432707, colour= "C_interval_En_lower"), linetype="dashed", size=0.9, show.legend = TRUE) +
+  geom_vline(aes(xintercept= 4.513602, colour= "C_interval_En_upper"), linetype="dashed", size=0.9, show.legend = TRUE) +
+  geom_vline(aes(xintercept= 3.939077, colour= "C_interval_Ctrl_lower"), linetype="dashed", size=0.9, show.legend = TRUE) +
+  geom_vline(aes(xintercept= 4.025749, colour= "CI_interval_Ctrl_upper"), linetype="dashed", size=0.9, show.legend = TRUE) +
+  guides(colour = guide_legend(title=expression(bold("Statistics")))) +
+  geom_density(alpha=.3, fill = "darkseagreen2") +
+labs(x=expression(bold("mean_distribution_Stand_Length")), y=expression(bold("Frequency")), title=expression(bold("Distribution of SL_combined")))
+
+
+# ggplot for Weight DF (combined data)
+
+combined_hist_data_Weight <- ggplot(data = Weight_dataframe, aes(Weight_dataframe$combined_weight_Data)) +
+  geom_histogram(aes(y = ..density..), alpha = 0.8, colour="black", fill="peachpuff", bins = 30) +
+  geom_vline(aes(xintercept= 0.6302481, colour = "mean_Control"), linetype="solid", size=1, show.legend=TRUE) +
+  geom_vline(aes(xintercept= 0.6806097, colour= "mean_Enriched"), linetype="solid", size=1, show.legend = TRUE) +
+  geom_vline(aes(xintercept= 0.6753320, colour= "C_interval_En_lower"), linetype="dashed", size=0.9, show.legend = TRUE) +
+  geom_vline(aes(xintercept= 0.6858875, colour= "C_interval_En_upper"), linetype="dashed", size=0.9, show.legend = TRUE) +
+  geom_vline(aes(xintercept= 0.6258413, colour= "C_interval_Ctrl_lower"), linetype="dashed", size=0.9, show.legend = TRUE) +
+  geom_vline(aes(xintercept= 0.6346550, colour= "CI_interval_Ctrl_upper"), linetype="dashed", size=0.9, show.legend = TRUE) +
+  guides(colour = guide_legend(title=expression(bold("Statistics")))) +
+  geom_density(alpha=.3, fill = "seagreen2") +
+  labs(x=expression(bold("mean_distribution_Weight")), y=expression(bold("Frequency")), title=expression(bold("Distribution of Weight_combined")))
+
+
+
+
+require(gridExtra)
+grid.arrange(combined_hist_data_Weight, combined_hist_data_SL, ncol=1, nrow=2)
+```
+
+
+In order to evaluate the strength of the relationship between the two continuous variables, we used a simple linear regression assuming normality. I decided to run two packages in R (lmodel1 & 2) in order to see if there was any difference. In reference of the model 2 linear regression, I overlayed the SMA line which shows the reduced model axis and was applied via this equation: (weight) = a+b(SL) or more commonly known as y=mx +b (Figure 4). From this, we were able to conclude that the model 1 fit was more sufficient in regards to illustrating the strength of the relationship between the two continuous variables (SL & Weight). Referencing model1 figures can be found in supplemental material (Figure S3). 
+
+Supplemental Material
+------------------------
+
+`r colFmt("**Figure S1**", 'black')`
+```{r echo=FALSE}
+#group needs to be only categorical variables
+
+Data_summary_SL <- group_by(Zebra_fish_diet_data_final, Diet) %>%
+  summarise_at("SL", .funs = c(Variance = "var", Mean="mean", SD="sd", median="median")) %>%
+  write.csv('SL_Summary_Stats.csv', row.names = F)
+
+
+Data_summary_Weight <- group_by(Zebra_fish_diet_data_final, Diet) %>%
+  summarise_at("Weight", .funs = c(Variance = "var", Mean="mean", SD="sd", median="median")) %>%
+  write.csv('Weight_Summary_Stats.csv', row.names = F)
+
+
+# stats
+
+
+Weight_summary_table <- read.table("Weight_Summary_Stats.csv", sep = ",", header = TRUE)
+SL_summary_table <- read.table("SL_Summary_Stats.csv", sep = ",", header = TRUE)
+
+Summary_table <- rbind(Weight_summary_table, SL_summary_table)
+
+Summary_table$Variable <- c("SL", "SL", "Weight", "Weight")
+
+
+# flipping columns 
+Summary_table <- Summary_table[c("Variable", "Diet", "Variance", "Mean", "SD", "median")]
+
+Summary_table
+```
+
+
+
+
+
+
+`r colFmt("**Figure S2**", 'black')`
+```{r echo=FALSE}
+# histogram of the bootstrap DFs and using column [,1] for aesetics 
+
+Bootstrap_control_weight_Hist <- ggplot(data = bootstrap_DF, aes(bootstrap_DF$bootstrap_control_Weight)) +
+  geom_histogram(aes(y = ..density..), alpha = 0.5, colour="black", fill="white", bins = 15) +
+  geom_density(alpha=.3, fill = "darkseagreen2") +
+  labs(x=expression(bold("mean_dist_weight")), y=expression(bold("Frequency")), title=expression(bold("distribution of weight_control")))
+
+Bootstrap_enriched_weight_Hist <- ggplot(data = bootstrap_DF, aes(bootstrap_DF$bootstrap_enriched_Weight)) +
+  geom_histogram(aes(y = ..density..), alpha = 0.5,colour="black", fill="white", bins = 15) +
+  geom_density(alpha=.3, fill = "steel blue") +
+  labs(x=expression(bold("mean_dist_weight")), y=expression(bold("Frequency")), title=expression(bold("distribution of weight_enriched")))
+
+Bootstrap_control_SL_Hist <- ggplot(data = bootstrap_DF, aes(bootstrap_DF$bootstrap_control_SL)) +
+  geom_histogram(aes(y = ..density..), alpha = 0.5,colour="black", fill="white", bins = 30) +
+  geom_density(alpha=.3, fill = "steel blue") +
+  labs(x=expression(bold("mean_dist_SL")), y=expression(bold("Frequency")), title=expression(bold("distribution of SL_control")))
+
+Bootstrap_enriched_SL_Hist <- ggplot(data = bootstrap_DF, aes(bootstrap_DF$bootstrap_enriched_SL)) +
+  geom_histogram(aes(y = ..density..), alpha = 0.5,colour="black", fill="white", bins = 30) +
+  geom_density(alpha=.3, fill = "darkseagreen2") +
+  labs(x=expression(bold("mean_dist_SL")), y=expression(bold("Frequency")), title=expression(bold("distribution of SL_enriched")))
+
+
+
+require(gridExtra)
+grid.arrange(Bootstrap_control_weight_Hist, Bootstrap_enriched_weight_Hist, Bootstrap_control_SL_Hist, Bootstrap_enriched_SL_Hist, ncol=2, nrow=2)
+```
+
+
+
+
+
+`r colFmt("**Figure S3**", 'black')`
+
+```{r echo=FALSE}
+# part 5
+
+
+
+x <- Zebra_fish_diet_data_final$SL
+y <- Zebra_fish_diet_data_final$Weight
+
+#View(x)
+
+# model 1 (four plots supplemental) assumptions we did for model 1
+zfish_lm <- lm(y ~ x)
+
+#summary(zfish_lm)
+
+plot(y ~ x, col = "blue")
+abline(zfish_lm, col = "green")
+
+plot(zfish_lm)
+```
+
+
+

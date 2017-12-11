@@ -1,0 +1,412 @@
+---
+title: "PS3_Rmarkdown_Output_Bi624"
+author: "Dane Dewees"
+date: '`r date()`'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r echo=FALSE}
+#Color Format - `r colFmt("green TEXT",'green')`
+library(knitr)
+colFmt = function(x,color){
+  outputFormat = opts_knit$get("rmarkdown.pandoc.to")
+  if(outputFormat == 'latex')
+    paste("\\textcolor{",color,"}{",x,"}",sep="")
+  else if(outputFormat == 'html')
+    paste("<font color='",color,"'>",x,"</font>",sep="")
+  else
+    x
+}
+```
+
+```{r echo=FALSE, include=FALSE}
+setwd("/Users/Deweesd/Desktop")
+getwd
+
+
+
+
+
+
+
+# Load the package that contains the full dataset.
+source("https://bioconductor.org/biocLite.R")
+biocLite("DESeq2")
+
+library(DESeq2)
+library(ggplot2)
+
+
+require(gridExtra)
+```
+
+```{r echo=FALSE}
+metadata_df <- read.csv("SFseq_metadata.txt", sep = '\t', row.names = "libraryID")
+
+metadata_df$cell_passage <- as.factor(metadata_df$cell_passage)
+
+counts_df <- as.matrix(read.csv("geneDEoutputFixed.tsv", sep = '\t', check.names = FALSE, row.names = 1))
+```
+
+
+**Part 1 (Experimental Design)**
+-------------------------------
+
+  *Question 1*: 
+    
+    The are no response variables in metadata file, the only response variables associated to this deisgn is genecounts     (in seperate file).
+  
+  *Question 2*:
+    
+    Explanatory vairables: cell passage, MBNL_induced, RBFOX1_induced.
+    
+  *Question 3*: 
+    
+    The design is factorial (multiple factorial design) due to the levels of each factor in     the design. Since there are three facotrs (explained above) that shows a full factorial     design.
+
+  *Question 4*: 
+  
+    It is not balanced due to the variety in total count of levels in each factor.
+    
+  *Question 5*: 
+  
+    No because we have different combonations within one factor compared to another.
+
+
+**Part 2 (DESeq2 object construction and initial visualization)**
+-----------------------------------------------------------------
+
+```{r echo=FALSE}
+# verify that counts file column names and metadata rownames are in the same order!
+all(rownames(metadata_df) == colnames(counts_df))
+
+
+# Create matrix and start with additive model including all factors
+
+
+#dds_matrix <- DESeqDataSetFromMatrix(countData = counts_df, colData = metadata_df, 
+                                       #design = ~ cell_plate_sample_ID + cell_passage + MBNL_induced + RBFOX1_induced + student)
+```
+
+After trying to creating a matrix, an error occurs due to the model matrix not being in full rank (the column of cell_plate_sample_ID have duplicates which shows that there is a nesting factor in the matrix which prevents it no be fully ranked). After observing the files, I determined that the technical replication is the sample ID b/c (you test the technical replicates for each sample and since you test it multiple times you have to get rid of the replicate) 
+and the batch variable is student ID (needed later on to correct for student variation with regards to differences in prep).
+
+`r colFmt("Part 3 - Construct DESeqDataset, get ridof genes < 10, normalize values, and produce PCA plot for both Technical and Batch effect variables", 'green')`
+
+
+                            *Technical Replication Variance*
+```{r echo=FALSE}
+## Tech reps
+dds_techreps <- DESeqDataSetFromMatrix(countData = counts_df, colData = metadata_df, 
+                                       design = ~ cell_plate_sample_ID)
+dds_techreps
+
+# Get rid of genes with low counts across samples
+keep <- rowSums(counts(dds_techreps)) >= 10
+dds_techreps <- dds_techreps[keep,]
+#dds_techreps
+
+
+# In prep. for PCA, generate normalized, log2-transformed counts,
+# using vst (variance-stabilizing transformation) to remove mean-var. relationship.
+vsd_techreps <- vst(dds_techreps, blind=FALSE)
+```
+
+
+
+
+                              *Batch Effect Variance*
+```{r echo=FALSE}
+## batch reps
+dds_batchreps <- DESeqDataSetFromMatrix(countData = counts_df, colData = metadata_df, 
+                                        design = ~ student)
+dds_batchreps
+
+# Get rid of genes with low counts across samples
+keep <- rowSums(counts(dds_batchreps)) >= 10
+dds_batchreps <- dds_batchreps[keep,]
+#dds_batchreps
+
+# In prep. for PCA, generate normalized, log2-transformed counts,
+# using vst (variance-stabilizing transformation) to remove mean-var. relationship.
+vsd_batchreps <- vst(dds_batchreps, blind=FALSE)
+```
+
+
+
+
+*PCA plot for Technical replication*
+
+```{r echo=FALSE}
+# Produce a quick PCA plot to evaluate dissimilarity among factor levels.
+plot_tech <- plotPCA(vsd_techreps, intgroup=c("cell_plate_sample_ID"), returnData=TRUE)
+percentVar <- round(100 * attr(plot_tech, "percentVar"))
+ggplot(plot_tech, aes(PC1, PC2, color=cell_plate_sample_ID)) +
+  geom_point(size=1) +
+  geom_text(aes(label=ifelse(cell_plate_sample_ID=="2B"|cell_plate_sample_ID=="4A",as.character(cell_plate_sample_ID),''))) +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed(ratio=4)
+```
+
+
+*PCA plot for Batch effect variable*
+```{r echo=FALSE}
+# Produce a quick PCA plot to evaluate dissimilarity among factor levels.
+plot_batch <- plotPCA(vsd_batchreps, intgroup=c("student"), returnData=TRUE)
+percentVar_2 <- round(100 * attr(plot_batch, "percentVar"))
+ggplot(plot_batch, aes(PC1, PC2, color=student)) +
+  geom_point(size=1) +
+  geom_text(aes(label=ifelse(student=="Jake"|student=="Adrian",as.character(student),''))) +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed(ratio=4)
+```
+
+There is not a clear batch effect b/c there is no clear clustering shown that indicates batch effect (Nicky and Matt show some signs of batch effect) when looking at the tehnical replication plots. There is some slight composition similarirty with regards to technical replicates (reference cluster above 4A on +4 value of x-axis).
+
+
+Because only 2 libraries were technically duplicated, drop the duplicate with fewer total reads in both cases from the original counts matrix and metadata data frame for subsequent analyses.
+
+```{r echo=FALSE}
+counts_df <- as.data.frame(counts_df)
+
+#View(counts_df)
+
+# remove lowest counts for genecount file
+counts_df$`2_2B_control` <- NULL
+
+counts_df$`24_4A_control` <- NULL
+
+counts_df <- as.matrix(counts_df)
+
+# remove the 2 rows that are associated with the lowest counts
+metadata_df <- metadata_df[-c(2,18),]
+```
+
+**Part 3 (Main effect tests)**
+-----------------------------
+
+
+
+`r colFmt("Construct a new DESeqDataSet object, specifying an additive model with all terms except the technical replicate and batch effect terms (we decided to exclude those).", 'green')`
+```{r echo=FALSE}
+## lets re-specify the model, including just the biological terms of interest.
+
+dds_full <- DESeqDataSetFromMatrix(countData = counts_df, colData = metadata_df, 
+                                   design = ~ cell_passage + MBNL_induced + RBFOX1_induced)
+#dds_full
+
+
+# Get rid of genes with low counts across samples
+keep <- rowSums(counts(dds_full)) >= 10
+dds_full <- dds_full[keep,]
+#dds_full
+
+
+## Now, test the overall effect of all the three factors
+## The function DESeq() does the heavy lifting of paramter estimation.
+dds_full <- DESeq(dds_full)
+
+
+
+# The results() function actually performs hypothesis tests of interest
+results(dds_full)
+```
+
+
+`r colFmt("Test for any genes differentially expressed by MBNL induction, controlling for effects of cell passage and RBFOX1 induction.", 'green')`
+
+```{r echo=FALSE}
+
+MBNL_results <- results(dds_full, contrast=c("MBNL_induced", "Yes", "No"))
+# Without specifying contrasts, results() will test the effect of the last term in the
+# model specified above.
+#head(MBNL_results)
+
+
+# always specify your desired contrasts!
+summary(MBNL_results)
+
+
+
+
+# order by adjusted p-value
+MBNL_results[order(MBNL_results$pvalue),]
+```
+
+There are zero genes that are differentially expression when looking at summary of MBNL.
+
+*Plot the expression values (compare MBNL Yes vs. MBNL No) of the gene with the highest fold change estimate*
+
+```{r echo=FALSE}
+## Individual gene plots
+## For example, can use a DESeq2 function to plot norm. expression values from single genes
+plotCounts(dds_full, gene=which.min(MBNL_results$padj), intgroup="MBNL_induced")
+#(default is to plot on a log2-scaled y-axis)
+```
+
+
+*Produce an “MA plot” to show the distribution of log2 fold changes and expression levels among genes for the MBNL test.*
+```{r echo=FALSE}
+plotMA(MBNL_results, main = expression(bold("MBNL_log_fold_change_plot")))
+```
+
+
+  **Repeat all steps from above but for the other categorical variable; RBFOX1**
+  
+```{r echo=FALSE}
+#### testing for RBFOX1 effect on gene expression ####
+
+RBFOX1_results <- results(dds_full, contrast=c("RBFOX1_induced", "Yes", "No"))
+# Without specifying contrasts, results() will test the effect of the last term in the
+# model specified above.
+#head(RBFOX1_results)
+
+# always specify your desired contrasts!
+summary(RBFOX1_results)
+
+## There are zero genes that are differentially expression when looking at summary of RBFOX1 results
+
+
+# order by adjusted p-value
+RBFOX1_results[order(RBFOX1_results$pvalue),]
+```
+
+```{r echo=FALSE}
+## Individual gene plots
+## For example, can use a DESeq2 function to plot norm. expression values from single genes
+plotCounts(dds_full, gene=which.min(RBFOX1_results$padj), intgroup="RBFOX1_induced")
+#(default is to plot on a log2-scaled y-axis)
+```
+
+```{r echo=FALSE}
+plotMA(RBFOX1_results, main = expression(bold("RBFOX1_log_fold_change_plot")))
+```
+
+**Part 4 (Interaction effects tests using contrasts)**
+-----------------------------------------------------
+
+```{r echo=FALSE}
+
+######## Part 4 Interaction effects test using contrasts ########
+
+## Set up the model, but with a MBNL-by-RBFOX1 interaction
+design(dds_full) <- formula(~ MBNL_induced + RBFOX1_induced + MBNL_induced:RBFOX1_induced)
+dds_full <- DESeq(dds_full)
+
+
+
+# This function will output the possible contrasts for this design
+resultsNames(dds_full)
+
+
+## The MBNL effect
+summary(results(dds_full, contrast=c("MBNL_induced","Yes","No")))
+
+## The RBFOX1 effect --> shows theres only an effect of expressed genes
+summary(results(dds_full, contrast=c("RBFOX1_induced", "Yes", "No")))
+
+
+# The MBNL effect for the RBFOX1 interaction
+# this is, by definition, the effect above "plus" the interaction term
+summary(results(dds_full, list(c("MBNL_induced_Yes_vs_No","MBNL_inducedYes.RBFOX1_inducedYes"))))
+
+
+
+
+# The interaction term, answering: is the MBNL effect "different" 
+# between the RBFOX1?
+summary(results(dds_full, name="MBNL_inducedYes.RBFOX1_inducedYes"))
+
+sum_int <- results(dds_full, name="MBNL_inducedYes.RBFOX1_inducedYes")
+
+
+# Let's produce an interaction plot for the gene with the smallest interaction p-value
+plotCounts(dds_full, gene=which.min(sum_int$padj), intgroup=c("MBNL_induced","RBFOX1_induced"))
+
+
+# how does the statistical power to detect interactions compare to the power to detect main effects?
+
+#
+```
+
+The statistical power to detect interactions compared to the power to detect main effects shows a clear differentiation with regards to output. Power of statistical tests increases when treatments and samples are reduced. Main effects model will have a higher power due to less variations within samples and treatment groups.
+
+
+
+**Part 5 (Individual Candidate Genes)**
+
+```{r echo=FALSE}
+## Set up the model, but with a MBNL-by-RBFOX1 interaction
+design(dds_full) <- formula(~ cell_passage + MBNL_induced + RBFOX1_induced + MBNL_induced:RBFOX1_induced)
+dds_full <- DESeq(dds_full)
+
+resultsNames(dds_full)
+
+
+
+
+##RBFOX1 interaction##
+
+g1 <- plotCounts(dds_full, gene="ENSMUSG00000044167", intgroup=c("RBFOX1_induced", "cell_passage"), returnData = TRUE)
+g1_p <- ggplot(g1, mapping = aes(x = RBFOX1_induced, y = count, color = cell_passage)) + 
+  geom_point() + 
+  ggtitle("RBFOX1 ~ Foxo1a") + 
+  theme(plot.title = element_text(size = 8, face="bold"), axis.title = element_text(size = 8))
+
+g1_p
+
+
+g2 <- plotCounts(dds_full, "ENSMUSG00000048756", intgroup = c("RBFOX1_induced", "cell_passage"), returnData = TRUE)
+g2_p <- ggplot(g2, mapping = aes(x = RBFOX1_induced, y = count, color = cell_passage)) + 
+  geom_point() + 
+  ggtitle("RBFOX1 ~ Foxo3a ") + 
+  theme(plot.title = element_text(size = 8, face="bold"), axis.title = element_text(size = 8))
+
+
+g2_p
+
+g3 <- plotCounts(dds_full, gene = "ENSMUSG00000029505", intgroup = c("RBFOX1_induced", "cell_passage"), returnData = TRUE)
+
+
+
+g3_p <- ggplot(g3, mapping = aes(x = RBFOX1_induced, y = count, color = cell_passage)) + 
+  geom_point() + 
+  ggtitle("RBFOX1 ~ p400 ") + 
+  theme(plot.title = element_text(size = 8, face="bold"), axis.title = element_text(size = 8))
+
+g3_p
+
+
+##MBNL interaction##
+
+g1_MBNL <- plotCounts(dds_full, gene = "ENSMUSG00000027763", intgroup = c("MBNL_induced", "cell_passage"), returnData = TRUE)
+
+g1_MBNL_p <- ggplot(g1_MBNL, mapping = aes(x = MBNL_induced, y = count, color = cell_passage)) + 
+  geom_point() + 
+  ggtitle("MBNL ~ Mbnl1 ") + 
+  theme(plot.title = element_text(size = 8, face="bold"), axis.title = element_text(size = 8))
+
+g1_MBNL_p
+
+g2_MBNL <- plotCounts(dds_full, gene = "ENSMUSG00000001419", intgroup = c("MBNL_induced", "cell_passage"), returnData = TRUE)
+
+g2_MBNL_p <- ggplot(g2_MBNL, mapping = aes(x = MBNL_induced, y = count, color = cell_passage)) + 
+  geom_point() + 
+  ggtitle("MBNL ~ Mef2d ") + 
+  theme(plot.title = element_text(size = 8, face="bold"), axis.title = element_text(size = 8))
+
+g2_MBNL_p
+
+g3_MBNL <- plotCounts(dds_full, gene = "ENSMUSG00000029862", intgroup = c("MBNL_induced", "cell_passage"), returnData = TRUE)
+
+g3_MBNL_p <- ggplot(g3_MBNL, mapping = aes(x = MBNL_induced, y = count, color = cell_passage)) + 
+  geom_point() + 
+  ggtitle("MBNL ~ Clcn1 ") + 
+  theme(plot.title = element_text(size = 8, face="bold"), axis.title = element_text(size = 8))
+
+g3_MBNL_p
+```

@@ -1,0 +1,356 @@
+---
+title: "IA2_Rmarkdown_Output_Bi610"
+author: "Dane Dewees"
+date: '`r date()`'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r echo=FALSE}
+#Color Format - `r colFmt("green TEXT",'green')`
+library(knitr)
+colFmt = function(x,color){
+  outputFormat = opts_knit$get("rmarkdown.pandoc.to")
+  if(outputFormat == 'latex')
+    paste("\\textcolor{",color,"}{",x,"}",sep="")
+  else if(outputFormat == 'html')
+    paste("<font color='",color,"'>",x,"</font>",sep="")
+  else
+    x
+}
+```
+
+```{r echo=FALSE, include=FALSE}
+# Load the package that contains the full dataset.
+library(car)
+library(corrplot) # used corrplot later for correlation plot.
+library(visreg) # This library used to show multivariate graphs.
+library(rgl)
+library(knitr)
+library(scatterplot3d)
+library(plotly)
+
+require(gridExtra)
+```
+
+
+```{r echo=FALSE}
+setwd("/Users/Deweesd/Desktop/Advanced_Stats_with_R/IA2")
+
+
+
+
+plants_df <- read.table("Plant_stress-1.tsv", sep = '\t', header = T)
+
+prot_1 <- plants_df$ERD10
+prot_2 <- plants_df$NCED9
+prot_3 <- plants_df$SRK2D
+```
+
+
+
+
+Statistical Analysis
+---------
+
+Obtained data from Dr. Bill Cresko's lab were compared using a two-factor fixed effects ANOVA model. Analysis was focused on the effects of a three-level protein concentartions (ERD10, NCED9, and SRK2D, respectively) via mass spectrometry in root tissues of Arabidopsis plants that are infleunced by *water* and *genotype*. Water treatment had two levels: *control* and *stress*. Genotype had two levels: *mutant* and *wildtype*.  This was followed by Post hoc analysis (Tukey) of the sublevels for the three protein mean distribution. A P value <0.05 was considered to be statistically significant.
+
+
+**Genotype**
+
+The Null hypothesis assumes that there is no signifiant difference between WT and mutant genotype. The alternative hypothesis assumes that there is a significant difference between the two levels of the categorical variable (i.e., WT and mutant genotype):
+
+ 
+ $$H_{0}(Genotype):  \mu_{WT} = \mu_{Mutant}$$
+
+ $$H_{A}(Genotype): \mu_{WT} \neq  \mu_{Mutant}$$
+
+**Water**
+
+The Null hypothesis assumes that there is no signifiant difference between control and stress water treatment. The alternative hypothesis assumes that there is a significant difference between the two levels of the categorical variable (i.e., stress and control):
+
+  $$H_{0}(Water):  \mu_{control} = \mu_{stress}$$
+  $$H_{A}(Water): \mu_{control} \neq  \mu_{stress}$$
+  
+  
+**Genotype_Water_Interaction**
+  
+The Null hypothesis for the interaction assumes that there is no interaction between the two levels of both water and genotype. The alternative hypothesis assumes that there is an interaction between said levels of both the established factors in study (Water and Genotype): 
+
+
+  $$H_{0}(Genotype:Water):  \mu_{ij} = \mu_{i} + \mu_{j} - \mu$$
+  $$H_{A}(Genotype:Water): \mu_{ij} \neq + \mu_{i} + \mu_{j} - \mu$$
+
+
+
+
+
+
+
+**Results**
+-----------
+
+Once the two factor and the levels associated within each factor was established, a two-factor fixed ANOVA model was used to measure the distribution across the protein abundance relative to the two factors. Using explaratory analysis presented insight towards differences between the two factors when cross-referencing against the three proteins. Linear combinations was anaylzed and determined the use of a two-way ANOVA model for further anaylsis. As shown in Figure 1, there was a spread in mean difference across genotype levels of *mutant* vs *wildtype* for protein NCED9. There was no difference (notable) between *water* and *genotype* for the other two proteins (Sup. Figure 1).
+
+
+
+
+
+
+**Figure 1**
+
+
+```{r echo=FALSE}
+#Two-factor ANOVA design  
+
+genotype <- plants_df$Genotype
+water <- plants_df$Water
+
+# water_genotype intercation 
+
+plants_df$h20_geno_interaction <- interaction(water, genotype)
+
+# water_genotype intercation 
+
+plants_df$h20_geno_interaction <- interaction(water, genotype)
+#scale to factor in assumption difference when running anova
+
+plants_df$scailed_zscore_ERD10 <- scale(plants_df$ERD10)
+plants_df$scailed_zscore_NCED9 <- scale(plants_df$NCED9)
+plants_df$scailed_zscore_SRK2D <- scale(plants_df$SRK2D)
+```
+
+```{r echo=FALSE}
+# creating subset DFs for both genotype factor treatments
+subset_data_mutant <- subset(plants_df, Genotype=="mutant")
+subset_data_wildtype <- subset(plants_df, Genotype=="wildtype")
+
+# creating subset DFs for both water factor treatments 
+subset_data_control <- subset(plants_df, Water=="control")
+subset_data_stress <- subset(plants_df, Water=="stress")
+```
+
+```{r echo=FALSE}
+
+prot2_genotype <- ggplot(data = plants_df) +
+  geom_boxplot(aes(x = genotype, y = plants_df$scailed_zscore_NCED9), col= c("steelblue", "red")) +
+  labs(x=expression(bold("genotype")), y=expression(bold("Protein_Abundancy")), title=expression(bold("Protein2 ~ Genotype")))
+
+
+prot2_water <- ggplot(data = plants_df) +
+  geom_boxplot(aes(x = water, y = plants_df$scailed_zscore_NCED9), col = c("steelblue", "red")) +
+  labs(x=expression(bold("water_treat")), y=expression(bold("Protein_Abundancy")), title=expression(bold("Protein2 ~ Water")))
+
+grid.arrange(prot2_genotype, prot2_water, ncol=2)
+
+```
+
+Interaction plots were used for each of the three proteins to demonstrate mean differences when looking at the interaction of Water treatment when applied to wildtype Genotype plant in ERD10 (Figure 2). Furthermore, when referencing the figure, one can see a distinction between the two levels of genotype, despite the presence of water treatments for the protein NCED9. The SRK2D gene expression expression frequency showed difference when compared with mutant plants & the stress water treatment from all other linear combinations of factors.
+
+
+
+**Figure 2**
+
+
+```{r echo=FALSE}
+prot1_interaction <- ggplot(data = plants_df) +
+  geom_boxplot(aes(x = plants_df$h20_geno_interaction, y = prot_1), col= c("steelblue", "red", "springgreen3", "khaki3")) +
+  labs(x= NULL, y=expression(bold("Protein_Abundancy")), title=expression(bold("ERD10 ~ H20_genotype")))
+
+prot2_interaction <- ggplot(data = plants_df) +
+  geom_boxplot(aes(x = plants_df$h20_geno_interaction, y = prot_2), col= c("steelblue", "red", "springgreen3", "khaki3")) +
+  labs(x= NULL, y=expression(bold("Protein_Abundancy")), title=expression(bold("NCDE9 ~ H20_genotype")))
+
+prot3_interaction <- ggplot(data = plants_df) +
+  geom_boxplot(aes(x = plants_df$h20_geno_interaction, y = prot_3), col= c("steelblue", "red", "springgreen3", "khaki3")) +
+  labs(x= NULL, y=expression(bold("Protein_Abundancy")), title=expression(bold("SRK2D ~ H20_genotype")))
+
+
+grid.arrange(prot1_interaction, prot2_interaction, prot3_interaction, ncol=3)
+```
+
+
+
+Following assumptions test and explaratory analysis, patterns indicated that normality assumption was not present for 95% confidence interval for both SRK2D & NCED9. No alterations were made to the dataset, but the output was something to note. Assumption for homoskedasticity of error variances also showed some violationed for all three of the listed proteins. Dertmining the two categorical variables as being fixed enabled the use of factorial ANOVA model (fitted) which was demonstrared on the three protein concentrations. All levels of expression were normalized for comparisons sake. 
+
+As seen in Figure 3 (Supp. Table 1), there was a signifiant interaction between genotype & water (alpha = 0.05 comparison level, F3,76 = 40.61, P = 1.299e-08).
+
+
+**Figure 3**
+
+```{r echo=FALSE}
+
+
+interaction_plot_Protein_ERD10 <- ggplot() + aes(x = water, group = genotype, color = genotype, y = plants_df$scailed_zscore_ERD10) + 
+  scale_color_brewer(palette="Paired") +
+  stat_summary(fun.y = mean, geom = "point") + 
+  stat_summary(fun.y = mean, geom = "line") +
+  theme_gray(base_size = 12) +
+  ggtitle("Interaction between Genotype & Water Treatment for ERD10") +
+  ylab("ERD10 Expression Frequency") +
+  theme(plot.title = element_text(size=14))
+
+interaction_plot_Protein_ERD10
+
+```
+
+The use of a Tukey post-hoc test indicated that there was in fact mean differences between mutant and wildtype *genotypes* when cross-referenced against *water* treatment 'control' (P = 0.00005, Supp. Table 2a) when looking at the protein ERD10. Same was shown when looking at the mutant and wildtype *genotypes* when cross referenced with the *water* treatment 'strees' (P = 0.0003, Supp. Table 2a). When looking at NCED9, there was no statistically significant interaction between the two facotrs: *genotype* and *water*. The use of Tukey post-hoc was used to determine the mean differences between the *water* treatment levels (stress & control). The main effects model, which including factor variables Water and Genotype explain 67.5% of the variation in NCED9 normalized gene expression (Supp. Table 2b). Same was applied for SRK2D and there was a statistical interaction between *genotype* & *water* with regards to gene expression levels (Figure 4).
+
+
+
+**Figure 4**
+
+```{r echo=FALSE}
+interaction_plot_Protein_SRK2D <- ggplot() + aes(x = water, group = genotype, color = genotype, y = plants_df$scailed_zscore_SRK2D) + 
+  scale_color_brewer(palette="Pastel1") +
+  stat_summary(fun.y = mean, geom = "point") + 
+  stat_summary(fun.y = mean, geom = "line") +
+  theme_gray(base_size = 12) +
+  ggtitle("Interaction between Genotype & Water Treatment for SRK2D") +
+  ylab("NCED9 Expression Frequency") +
+  theme(plot.title = element_text(size=14))
+
+interaction_plot_Protein_SRK2D
+```
+
+
+Variation seen in Figure 4 for SRK2D is explained with the interaction effects model with factor variables Water and Genotype. The overall mean-difference can be shown with regards to the liear trajectory in Figure 4 when referencing Plant differentiation. Variation in *genotype* plants showed to be statistically significant different with regards to the effect on normalized SRK2D gene expression values under the stress Water treatment (P < 0.0001, Supp. Table 3b).
+
+
+Supplemental Material:
+-----------------------
+
+
+
+
+
+
+
+
+
+**Supp. Figure 1**
+```{r echo=FALSE}
+####testing the two factors of water and genotype to protein (response variables)####
+
+
+##Boxplots for each of the two factors and protein levels##
+
+
+
+prot1_genotype <- ggplot(data = plants_df) +
+  geom_boxplot(aes(x = genotype, y = plants_df$scailed_zscore_ERD10)) +
+  labs(x=expression(bold("genotype")), y=expression(bold("Protein_Abundancy")), title=expression(bold("Protein1 ~ Genotype")))
+
+prot2_genotype <- ggplot(data = plants_df) +
+  geom_boxplot(aes(x = genotype, y = plants_df$scailed_zscore_NCED9)) +
+  labs(x=expression(bold("genotype")), y=expression(bold("Protein_Abundancy")), title=expression(bold("Protein2 ~ Genotype")))
+
+prot3_genotype <- ggplot(data = plants_df) +
+  geom_boxplot(aes(x = genotype, y = plants_df$scailed_zscore_SRK2D)) +
+  labs(x=expression(bold("genotype")), y=expression(bold("Protein_Abundancy")), title=expression(bold("Protein3 ~ Genotype")))
+
+prot1_water <- ggplot(data = plants_df) +
+  geom_boxplot(aes(x = water, y = plants_df$scailed_zscore_ERD10)) +
+  labs(x=expression(bold("water_treat")), y=expression(bold("Protein_Abundancy")), title=expression(bold("Protein1 ~ Water")))
+
+prot2_water <- ggplot(data = plants_df) +
+  geom_boxplot(aes(x = water, y = plants_df$scailed_zscore_NCED9)) +
+  labs(x=expression(bold("water_treat")), y=expression(bold("Protein_Abundancy")), title=expression(bold("Protein2 ~ Water")))
+
+prot3_water <- ggplot(data = plants_df) +
+  geom_boxplot(aes(x = water, y = plants_df$scailed_zscore_SRK2D)) +
+  labs(x=expression(bold("water_treat")), y=expression(bold("Protein_Abundancy")), title=expression(bold("Protein3 ~ Water")))
+
+
+grid.arrange(prot1_genotype, prot2_genotype, prot3_genotype, prot1_water, prot2_water, prot3_water, ncol=3, nrow=3)
+```
+
+
+
+
+
+**Supp. Figure 2**
+
+```{r echo=FALSE}
+interaction_plot_Protein_NCED9 <- ggplot() + aes(x = water, group = genotype, color = genotype, y = plants_df$scailed_zscore_NCED9) + 
+  scale_color_brewer(palette="Dark2") +
+  stat_summary(fun.y = mean, geom = "point") + 
+  stat_summary(fun.y = mean, geom = "line") +
+  theme_gray(base_size = 12) +
+  ggtitle("Interaction between Genotype & Water Treatment for NCED9") +
+  ylab("NCED9 Expression Frequency") +
+  theme(plot.title = element_text(size=14))
+
+interaction_plot_Protein_NCED9
+```
+
+**Supp. Table 1**
+```{r echo=FALSE}
+## assumptions for genotype to protein values | # assess assumptions of normality and homogeneity of variance 
+Prot_1_ANOVA <- aov(plants_df$scailed_zscore_ERD10 ~ water + genotype + water:genotype)
+Prot_2_ANOVA <- aov(plants_df$scailed_zscore_NCED9 ~ water + genotype + water:genotype)
+Prot_3_ANOVA <- aov(plants_df$scailed_zscore_SRK2D ~ water + genotype + water:genotype)
+
+
+
+## Examine the ANOVA table
+anova(Prot_1_ANOVA)
+
+
+```
+
+
+
+**Supp. Table 1b**
+
+```{r echo=FALSE}
+##post hoc analysis for model 1 (fixed model)
+TukeyHSD(Prot_1_ANOVA)
+
+
+```
+
+
+
+**Supp. Table 2**
+
+```{r echo=FALSE}
+anova(Prot_2_ANOVA)
+```
+
+
+**Supp. Table 2b**
+
+```{r echo=FALSE}
+TukeyHSD(Prot_2_ANOVA)
+```
+
+
+**Supp. Table 3**
+
+```{r echo=FALSE}
+anova(Prot_3_ANOVA)
+```
+
+**Supp. Table 3b**
+
+```{r echo=FALSE}
+TukeyHSD(Prot_3_ANOVA)
+```
+
+
+**Supp. Table 4**
+```{r echo=FALSE}
+
+#run Tukey post hoc test for mean comparison for NCE protein
+
+prot2_Tukey <- TukeyHSD(Prot_2_ANOVA, which = "water:genotype")
+prot2_Tukey_Water <- TukeyHSD(Prot_2_ANOVA, which = "water")
+prot2_Tukey_genotype <- TukeyHSD(Prot_2_ANOVA, which = "genotype")
+
+prot2_Tukey
+
+prot2_Tukey_Water
+
+prot2_Tukey_genotype

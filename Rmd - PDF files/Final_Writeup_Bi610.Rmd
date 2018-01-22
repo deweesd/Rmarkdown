@@ -1,0 +1,520 @@
+---
+title: "Final_Writeup_Bi610"
+author: "Dane Dewees"
+date: "December 8, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+``` {r, include = FALSE}
+ fig.dim <- 5
+ library(knitr)
+ opts_chunk$set(
+        fig.height=1.2*fig.dim,
+        fig.width=2*fig.dim,
+        fig.align='center'
+    )
+ 
+ #Color Format - `r colFmt("MY RED TEXT",'red')`
+colFmt = function(x,color){
+  outputFormat = opts_knit$get("rmarkdown.pandoc.to")
+  if(outputFormat == 'latex')
+    paste("\\textcolor{",color,"}{",x,"}",sep="")
+  else if(outputFormat == 'html')
+    paste("<font color='",color,"'>",x,"</font>",sep="")
+  else
+    x
+}
+``` 
+
+```{r, include=FALSE}
+getwd()
+#### Final Project for Stats - Bi610 ####
+setwd("/Users/Deweesd/Desktop/Advanced_Stats_With_R/Final_Project")
+
+library(magrittr)
+library(tidyverse)
+library(dplyr)
+library(pander)
+library(ggplot2)
+library(car)
+library(pwr)
+library(vegan)
+library(MASS)
+library(stargazer)
+
+RColorBrewer::display.brewer.all()
+
+require(gridExtra)
+```
+
+
+
+```{r echo=FALSE}
+
+Gacu_survival_df <- read.table("Gacu_survival_data.tsv", sep = '\t', header = T)
+Gacu_sex_df <- read.table("Gacu_sex_data.tsv", sep = '\t', header = T)
+Gacu_lipids_df <- read.table("Gacu_lipids_data.tsv", sep = '\t', header = T)
+Gacu_RNAseq_df <- read.table("Gacu_rnaseq_data.tsv", sep = '\t', header = T, row.names = 1)
+```
+
+
+Statistical Methods
+===================
+**File 1 - Survival**
+
+Using statistical packages in R, we parsed through 4 seperate datasets that presented raw data on how the presence of microbiota as well as the genetic background/variation of each host may influence phenotypic variation among the larval stickleback. The *first file contains information about whether each studied fish survived to 14 days post fertilization (or died)*. Utalizing a generalized linear model (glm) for the response variable of *survival*, it gave us the option of a binary aproach (yes or no) to test if assumptions were met. Various observations were viewed as independent. 
+
+**File 2 - Sex**
+
+For the second file, which *contained information about whether each experimental fish was female or male*, we also used glm in terms of analyses for the distribution and inlfuence of sex. The sex ratio, which was measured by the response variable in the sex data being binary (male or female), we assumed the normality assumption was not met. The most basic generalized linear models were fit intially to predict *Sex* given *Population* and *Microbiota*. 
+
+**File 3 - TAGs**
+
+For the third file, which *contained HPLC measurements of triacylglyceride (TAG) concentration in ug/mg for whole bodies of 14 dpf stickleback larvae.*. There was a temporal factor in this dataset that showed that the 14th day post-fertilization, there were sacrificed and processed for lipid concentration given the predictor variables assed above. The three variables were of a balance design, and thus we ran a Model I Fixed effects factorial ANOVA. Determining that *Sex* was the predictor variable causing the unbalanced nature of the experiment, we removed it from dataset (following confirmation using power analysis on the *Sex* variable given the outcome of insignificant results for both *Population* and *Microbiota* on the variable in the *sex_data_set*).  
+
+
+**File 4 - Gene count**
+
+For the fourth and final file, which contained *transcript abundance measures from RNA-seq data for individual 14 dpf fish intestines (with data for 300 genes expressed in the gut were included).*. Two different methods of non-metric multidimensional analysis was done on this dataset (PCoA and nMDS). Disimilarity matices were generated and assessed using the Bray-Curtis distance. Population, Microbiota, and Sex were of interest here. Given the dimensional data set, we ran multidivariate statistics to determine the distribution of gene expression given the categorical variables stated above. PCoA & nMDS analysis was ran for the data set in order to ensure the accurecy of gene count expression. 
+
+
+
+
+Results
+=======
+
+Objective from the four datasets was to quantify gene expression from the stickleback fish in ~300 genes based on the differences in both *Populations* and *Microbiotas*. Isolating the other factors that may be infleuntial to expression levels were mortality rates, lipid concentration, and sex were used to better understand the process of how Microbiota influences larval stickleback biology.
+
+*Microbiota* showed statistical significance with regards to the effect on *Survived* or not. (z = -2.235, p = 0.0254). Using the Chi-squared statistic supported the effect of *Microbiota* on *Survived* (X^2 = 5.2407, p = 0.02206). *Population* did not show a direct influence on the effects of survival rate (Supp. Table 1) in tested samples (z = 0.378, p= 0.705). Again, using the Chi-squared statistic helped support that there was not enough of an effect from *Population* on *Survived* (X^2 = 0.14343, p = 0.7049). The interaction between *Microbiota* and *Population* did not show any significance with regards to survival (X^2 = 0.2455, p = 0.6203) when referencing tables **supplemental tables 1:3a-c.**
+
+*Population*, *Microbiota*, and the interaction between the two is not statistically significant in terms of having an effect on *Sex* (Z = -0.675, P = 0.499), (Z = 1.118, p = 0.263), (Z = 1.121, p = 0.262) respectively when referencing **supplemental tables 4a-d.**
+
+
+
+
+Highlighting a clear distribution when referencing the significance of both *Population* and *Microbiota* with regards to TAGs freqeuncy is shown in both **Figures 1&2**. Each reperesent the difference across population's infleunce and microbiota type inlfuence on Tags abundance. **Figure 2** highlights the linear combinations of Population and Microbiota. This distinction between *Populations* ~ *Microbiota* in comparison to germ free shows the distribution across said factors. The interaction effects model showed a statistically significant effect on lipid content (F = 230.11, p < 2e-16). The interaction plot in **Figure 3** shows the comparison of both the main effects and interaction effects models side by side as they relate to the response variable of interest. *Population* and *Microbiota* seperately showed statistical significance with TAG concentration (F = 133.44, p < 2e-16, and F = 57.63, p = 6.64e-11). The effects gave an R2 of 0.841, which shows that 84.1% of the variation in TAGs concentration may be due to the interaction effects model of *Population* ~ *Microbiota*.All three of the terms in the interaction effects model have statistically signficant effects on TAGs expression (**Sup. Table 1**). One can conclude that the interaction between population and microbiota type (germ-free) has and influence on the influx of lipid expression (TAGs) in stickleback fish (**Figure 3**).
+
+
+ **Figures 4-6** illustrate the PCoA charts associated with *Population*, *Microbiota*, and the interaction between the two in ordination plots. **Figure 4** shows seperate clustering with regards to Boostrap (Bt) & Rabbit Slough (RS) *Population*. BS seem to cluster closer in distance than RS. **Figure 5** is similar but shows *Microbiota* treatment. Distance is more variable and there does seem to be a bit of overlap given the estimation of PCoA 1 and PCoA 2. **Figure 6** shows the interaction ordination plot between the two factors and highlights specific trends. 
+
+
+Referencing **Figure 7** shows the Red1 dots corresponding to the Bt *Population*, and slateblue2 corresponding to the RS *Population*. There are two distinct clusters but it seems that the clustering is not influenced based on *Population* alone. As you can see from **Figures 6-8**, the nMDS analysis via spiderplots highlights the clustering variation between groups while still maintaining similar structure to the PCoA chart (**Figure 6**) shown before. The distinct clustering in each plot was of course supported by significant effect values on gene expression from the use of permutation tests on the nMDS dimensions. *Microbiota* showed 8.8% variaion in the interaction plot as well as in gene expression (F = 5.39, p = 0.0019). *Population* seemed to also show similar trends as *Microbiota* with regards to gene expression infleunce (F = 5.39, p = 0.0019). Localizing the predictor variables gave infleunce to over ~15% of the variation in gene expression. **Table 1** shows that Microbiota, Population, and the interaction between the two showed statisitcal signifiance with having an effect on the derived variables nMDS 1 and nMDS 2 (Pr(>F) 0.000999, 0.0000999, and 0.028971 respectively). This also showed the disimilarity effects when looking at the interaction between the two factors. The disimilarity came out to be roughly 8.8% for *Microbioata* and 15% for *Population*. 
+
+
+
+
+
+
+
+**Figure 1**
+-------------
+```{r echo=FALSE}
+# Check if the model is balanced before proceeding 
+#replications(TAGs~Microbiota*Population, data = Gacu_lipids_df)
+
+#Identify the interaction term
+Gacu_lipids_df$Micro_Pop_Int <- interaction(Gacu_lipids_df$Microbiota, Gacu_lipids_df$Population)
+
+#Factor A
+Pop_ggplot <- ggplot(data = Gacu_lipids_df) + 
+  geom_boxplot(aes(x=Population, y=TAGs), fill=c("skyblue1", "red3")) +
+  labs(title = "TAGs ~ Population", x=expression(bold("Population")),
+  y=expression(bold("TAGs Expression")))
+
+#Factor B
+Micro_ggplot <- ggplot(data = Gacu_lipids_df) + 
+  geom_boxplot(aes(x=Microbiota, y=TAGs), fill=c("steelblue", "springgreen2")) +
+  labs(title = "TAGs ~ Microbiota", x=expression(bold("Microbiota type")),
+  y=expression(bold("TAGs Expression")))
+```
+
+
+
+```{r}
+grid.arrange(Pop_ggplot, Micro_ggplot, ncol=2, nrow=1)
+```
+
+**Figure 2**
+------------
+```{r echo=FALSE}
+ggplot(Gacu_lipids_df, aes(x=Micro_Pop_Int, y=TAGs, color = Microbiota)) +
+  geom_boxplot() +
+  labs(title = "Interaction_Microbiota + Population ~ TAG Expression")
+```
+
+
+
+```{r echo=FALSE}
+TAGs_main_Model <- lm(TAGs ~ Population+Microbiota, data = Gacu_lipids_df)    
+TAGs_int_Model <- lm(TAGs ~ Population*Microbiota, data = Gacu_lipids_df)    
+
+stargazer(TAGs_main_Model, TAGs_int_Model, type="text", 
+          column.labels = c("Main Effects", "Interaction Effects"), 
+          intercept.bottom = FALSE, 
+          single.row=TRUE,  
+          notes.append = FALSE, 
+          omit.stat=c("ser"),   
+          star.cutoffs = c(0.05, 0.01, 0.001),  
+          header=FALSE,
+          dep.var.labels = "TAGs Expression",
+          covariate.labels = c("(Intercept)", "Population", "Microbiota", "Population:Microbiota"))
+```
+
+**Figure 3**
+-------------
+```{r echo=FALSE}
+TAGs_int_Plot <- ggplot(Gacu_lipids_df) + aes(x = Microbiota, group = Population, color = Population, y = TAGs) + 
+  scale_color_brewer(palette="Accent") +
+  stat_summary(fun.y = mean, geom = "point") + 
+  stat_summary(fun.y = mean, geom = "line") +
+  theme_gray(base_size = 14) + 
+  ggtitle("Interaction_Population:Microbiota ~ TAGs Expression") +
+  ylab("TAGs Expression") + 
+  xlab("Microbiota type") +
+  theme(plot.title = element_text(size=14))
+
+TAGs_int_Plot
+```
+
+
+
+
+
+
+RNA_seq data
+============
+
+```{r echo=FALSE}
+Gacu_RNAseq_df <- read.table("Gacu_rnaseq_data.tsv", sep = '\t', header = T, row.names = 1)
+Gacu_RNAseq_df$Micro_Pop_Int <- interaction(Gacu_RNAseq_df$Microbiota, Gacu_RNAseq_df$Population)
+
+PCoA.res <- capscale(Gacu_RNAseq_df[,4:303]~1, distance = "bray")
+#summary(PcoA.res)
+
+PCoA_scores <- as.data.frame(scores(PCoA.res,display="sites"))
+PCoA_scores$Population <- Gacu_RNAseq_df$Population
+PCoA_scores$Microbiota <- Gacu_RNAseq_df$Microbiota
+PCoA_scores$Micro_Pop_Int <- Gacu_RNAseq_df$Micro_Pop_Int
+
+```
+
+**Figure 4**
+-------------
+```{r echo=FALSE}
+PCoA_pop <- ggplot(PCoA_scores, aes(MDS1, MDS2))+
+  geom_point(aes(color = Population)) +
+  labs(x="PCoA 1", y="PCoA 2")+
+  stat_ellipse(aes(color=Population)) +
+  scale_color_brewer(palette = "Accent") +
+  xlim(-1,1.3)+
+  ylim(-1,1.3) +
+  theme_classic() +
+  labs(title = "Pop_Ordination_Plot")
+
+
+PCoA_pop
+
+```
+Two distinct clusters, bootlake `Population1 seem to cluster closer in distance than Rabbit Slough.
+
+
+**Figure 5**
+-------------
+```{r echo=FALSE}
+PCoA_micro <- ggplot(PCoA_scores, aes(MDS1, MDS2))+
+  geom_point(aes(color = Microbiota)) +
+  labs(x="PCoA 1", y="PCoA 2")+
+  stat_ellipse(aes(color=Microbiota)) +
+  scale_color_brewer(palette = "Set1") +
+  xlim(-1,1.3)+
+  ylim(-1,1.3) +
+  theme_classic()+
+  labs(title = "Micro_Ordination_Plot")
+
+
+
+PCoA_micro
+```
+
+
+
+
+**Figure 6**
+------------
+
+
+```{r echo=FALSE}
+PCoA_int <- ggplot(PCoA_scores, aes(MDS1, MDS2))+
+  geom_point(aes(color = Micro_Pop_Int)) +
+  labs(x="PCoA 1", y="PCoA 2")+
+  stat_ellipse(aes(color= Micro_Pop_Int)) +
+  xlim(-1,1.3)+
+  ylim(-1,1.3) +
+  theme_classic()+
+  labs(title = "Population ~ Microbiota Interaction Ordination Plot")
+
+
+
+PCoA_int
+
+```
+
+
+
+
+
+```{r echo=FALSE}
+#Read in the counts file
+Factors <- read.table("Gacu_rnaseq_data.tsv", head = TRUE, sep = "\t", row.names = 1)
+#Delete all gene columns to make the file "Targets" the metadata file
+Factors[,4:303] <- NULL
+
+#Read in the counts file
+Gene_counts <- read.table("Gacu_rnaseq_data.tsv", head = TRUE, sep = "\t", row.names = 1)
+#Remove the categorical variables so only gene columns remain
+Gene_counts$Population <- NULL
+Gene_counts$Microbiota <- NULL
+Gene_counts$Sex <- NULL
+```
+
+```{r echo=FALSE}
+vare.dis <- vegdist(Gene_counts)
+vare.mds0 <- isoMDS(vare.dis, k=3)#This will reduce to 3 nMDS dimensions
+#stressplot(vare.mds0, vare.dis)
+#ordiplot(vare.mds0, type = "t")
+
+#This sets up a vector of factor level combinations for Microbiota and Population
+Factors$MicPop <- factor(paste(Factors$Microbiota,Factors$Population,sep="."))
+
+par(mgp = c(2.5, 1, 0))
+pop=as.character(Factors$Population)
+micro=as.character(Factors$Microbiota)
+micro_pop=as.character(Factors$MicPop)
+```
+
+**Figure 7**
+-------------
+```{r echo=FALSE, warning=FALSE}
+#spider plot by Population
+fig_Pop <- ordiplot(vare.mds0, main="Stickleback Guts in Transcript Space\n(By Population)",
+                ylab="nMDS Dimension 2", xlab="nMDS Dimension 1", 
+                font.lab=2, font.axis=2, cex.axis=.7, type="none", cex.main=1)
+ordispider(vare.mds0,groups=pop,label=TRUE)
+points(fig_Pop, "sites", pch=19, col=c(rep("red1",20),rep("slateblue2",20)), cex=1.2)
+```
+
+
+
+**Figure 8**
+-------------
+```{r echo=FALSE, warning=FALSE}
+#spider plot by microbiota
+fig_Mic <- ordiplot(vare.mds0, main="Stickleback Guts in Transcript Space\n(By Microbiota)",
+                ylab="nMDS Dimension 2", xlab="nMDS Dimension 1", font.lab=2, 
+                font.axis=2, cex.axis=.7, type="none", cex.main=1)
+ordispider(vare.mds0,groups=micro,label=TRUE)
+points(fig_Mic, "sites", pch=c(rep(19,6),rep(1,6),rep(19,6),rep(1,6),rep(19,6),rep(1,6),
+                           rep(19,6),rep(1,6)), cex=1.2)
+
+```
+
+
+**Figure 9**
+------------
+```{r echo=FALSE, warning=FALSE}
+#spider plot by Treatment-Population combination
+fig_Int <- ordiplot(vare.mds0, main="Stickleback Guts in Transcript Space\n(By Population and Microbiota)",ylab="nMDS Dimension 2", xlab="nMDS Dimension 1", font.lab=2, 
+                font.axis=2, cex.axis=.7, type="none", cex.main=1)
+ordispider(vare.mds0,groups=micro_pop,label=TRUE)
+points(fig_Int, "sites", pch=c(rep(19,6),rep(1,6),rep(19,6),rep(1,6),rep(19,6),rep(1,6),
+                           rep(19,6),rep(1,6)), col=c(rep("red1",20),rep("slateblue2",20)), cex=.8)
+
+
+```
+
+
+
+**Table 1 - Permutation test**
+----------------------------
+```{r echo=FALSE}
+#ADONIS for full (Pop,Trt) factorial design
+
+otu.env <- Factors #specify dataframe containing just expl. variables.
+
+#run ADONIS using pairwise Bray-Curtis dissimilarities from above
+adonis(vare.dis ~ Microbiota*Population, otu.env, perm=1000)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Discussion
+==========
+
+When looking at unique features in the Gnotobiotic organisms, one must understand how they are characterized by experimentally controlled assemblages of microbes. Isolating the microbiota in the intestines of stickleback fish while factoring in sex ratios, lipid content, and transcript abundance, one can infer differences across the distribution of gene expression in sticklaback fish. According to the literature, there is this mutual understanding that if fish is germ-free, it has a harder time ingesting food [2,3]. However, the data generated from Dr. Cresko's lab contradicts that. Since this data from lipid concentration and RNA_seq data were looked at concurrently, lipids or stickleback in the lab are shown to be fatter and bigger in this data than other studies. Utlizing the software R [1], we were able to apply statistical analysis and various computations in this paper. While looking at the RNA_seq data and running both PCoA and nMDS analysis, we found a pattern that fit both tests with regards to clustering between each factor and it's corresponding response variable (i.e., gene expression). The general trend showed across both the preliminary analysis in the intitial datasets and then in RNA seq dataset that both microbiota and population had a role in gene expression. When referencing **Figure 6** one can see four clusters given the four linear combinations of *Population* and *Microbiota*. Germ free *Microbiota* stickleback in the bootlake *Population* cluster most closely. The Rabbit Slough *Population* given the *Microbiota* CV treatment seemed to have the most variation (most distance between points) explained by PCoA 1 and PCoA 2. This is later confirmed in the nMDS analysis and shows similar trends with **Figure 9**. Given that the microbioata had the most signifiant effect on lipid concentration, we would also expect to see that in the RNA sequence data. As shown above, microbioata alone has been established as an infleuncer in lipid production. The difference across the various Microbiobiota tyes showes that a controlled rather than germ free environment could play a role in the natural production of lipid expression. As mentioned in [3] environmental factors such as intestinal microorganisms and diet can help represent attractive targets for localizing and more importantly control dietary lipid absorption and energy balance. When you factor in various populations, however, you see less of a trend with regards to an influx of lipid concentration (especially when referencing the Bt *Population*). Comparing the overall effect of *Population* & *Microbiota* with regards to disimilarity, one would have to reference the overall percentage that each factor had on gene expression. Cross referencing that data with the lipid concentration, we found that *Population* had a greater influence on gene expression when factoring in the interaction between the two than did *Microbioata*. This raises questions about the zebrafish at a younger stage of life and how controlled assemblages of microbes may influence host-microbe interactions. Seeing that this data highlights the influence of germ-free environments and it's role on the ingesting food, one might ask what other paramters are involved that allows the species to ingest despite having a diverse microbiome?. That is what other parameters might be playing a role that was not necesarily included in the model but may be infleuntial in the outcome. Referencing immune response cells and production of these cell types has previously been shown to be influenced by microbial cells. Many microbioal pathogenesis studies in this species have concentrated on the embryonic stages to better understand the infleunce of immune response cell production durin hematopoietic development [4]. Future studies could factor in a cluster of these cell types to see what are upregulated/downregulated and cross-reference them the data generated in this model to confirm whether or not that *Microbioata* and *Population* do in fact have a role in lipid gene expression. It's been establish that groups of immune cells undergo challenges during early stages of life for the stickleback fish which in turn could alter the proliferation, differentiation, and/or maintenance of hematopoietic immune cells[4]. Extending this model into further factors that were not included could help infer the difference between the gene expression levels and the stickleback fish microbiomes. 
+
+
+
+
+
+
+
+Literature Cited
+================
+
+[1] R Core Team (2014). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL: http://www.Rproject.org/.
+
+[2] Rawls et. al., (2006). Reciprocal Gut Microbiota Transplants from Zebrafish and Mice to Germ-free Recipients Reveal Host Habitat Selection, Center for Genome Sciences, Washington University School of Medicine, St. Louis, MO 63108 USA.
+
+[3] Semova et. al., (2012). 
+Microbiota Regulate Intestinal Absorption and Metabolism of Fatty Acids in the Zebrafish, University of North Carolina at Chapel Hill, Chapel Hill, NC 27599, USA
+
+[4] Katner., M. Rawls., J. (2002). Host–microbe interactions in the developing zebrafish, Curriculum in Genetics and Molecular Biology, University of North Carolina at Chapel Hill, Chapel Hill, NC, USA
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Supplemental Material
+=====================
+
+**Sup. Table 1**
+```{r echo=FALSE}
+#Survival ~ Microbiota
+Micro_Model <- glm(formula = Survived ~ Microbiota, family = binomial, data = Gacu_survival_df)
+
+summary(Micro_Model)
+```
+
+**Sup. Table 1a**
+```{r echo=FALSE}
+anova(Micro_Model, test = "Chisq")
+```
+
+
+**Sup. Table 2**
+```{r}
+
+#Survival ~ Population
+Pop_Model <- glm(formula = Survived ~ Population, family = binomial, data = Gacu_survival_df)
+summary(Pop_Model)
+```
+
+**Sup. Table 2a**
+```{r echo=FALSE}
+anova(Pop_Model, test = "Chisq")
+```
+
+
+
+
+```{r echo=FALSE}
+#Specifiy interaction effects model
+survival_glm_int <- glm(Gacu_survival_df$Survived ~ Gacu_survival_df$Population + Gacu_survival_df$Microbiota + Gacu_survival_df$Population:Gacu_survival_df$Microbiota, family = binomial, data = Gacu_survival_df)
+#summary(survival_glm_int)
+```
+
+**Sup. Table 3**
+```{r echo=FALSE}
+anova(survival_glm_int, test = "Chisq")
+```
+
+
+
+**File 2**
+
+
+**Sup. Table 4**
+```{r}
+
+#Model Sex ~ Population
+sex_model_pop <- glm(formula = Sex ~ Population, family = binomial, data = Gacu_sex_df)
+summary(sex_model_pop)
+```
+
+**Sup. Table 4a**
+```{r echo=FALSE}
+anova(sex_model_pop, test = "Chisq")
+
+#cdplot(Sex~Population, data=Gacu_sex_df) #conditional density plot sex given population
+#plot(sex_model_pop) 
+```
+
+
+**Sup. Table 4b**
+```{r}
+#Model Sex ~ Microbiota
+sex_model_micro <- glm(formula = Sex ~ Microbiota, family = binomial, data = Gacu_sex_df)
+summary(sex_model_micro)
+```
+
+
+**Sup. Table 4c**
+```{r echo=FALSE}
+
+anova(sex_model_micro, test = "Chisq")
+
+#cdplot(Sex~Microbiota, data=Gacu_sex_df) #conditional density plot survival status given microbiota
+#plot(sex_model_micro) 
+
+```
+
+
+**Sup. Table 4d**
+```{r}
+#Specifiy a binomial error distribution 
+sex_main_model <- glm(Gacu_sex_df$Sex ~ Gacu_sex_df$Population + Gacu_sex_df$Microbiota, family = binomial, data = Gacu_sex_df)
+summary(sex_main_model)
+#anova(mainModel, test = "Chisq")
+
+#plot(mainModel) 
+```
+
+
+**Sup. Table 5**
+```{r echo=FALSE}
+## Fit the factorial linear model
+TAGs_aov <- aov(TAGs ~ Population*Microbiota, data = Gacu_lipids_df)
+
+## Examine the fitted model diagnostics and core assumptions
+#plot(lipid_aov)
+
+#Levenes test for test of homogeneity of variances
+leveneTest(TAGs ~ Population*Microbiota, data = Gacu_lipids_df)
+
+#Shapiro Wilks test to test normality, should not be significant
+shapiro.test(Gacu_lipids_df$TAGs)
+# normality test not passed
+
+## Examine the ANOVA table
+#summary(TAGs_aov)
+
+#Run Tukey post hoc test for mean comparisons
+TAGs_Tukey <- TukeyHSD(TAGs_aov, which="Population:Microbiota")
+#print(lipid_Tukey)
+```
